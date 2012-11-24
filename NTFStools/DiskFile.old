@@ -1,0 +1,46 @@
+# -*- coding: mbcs -*-
+import array
+import logging
+
+class DiskFile(object):
+	"""Un disco può essere aperto come un file, tuttavia: 1) read, write, seek devono essere allineate
+	a settori di 512 byte; 2) seek dalla fine non è ammesso; 3) seek oltre la fine seguito
+	da una lettura non dà errori."""
+	
+	def __init__(this, name, mode='r', buffering=0, size=0):
+		this.myRawPos = 0
+		this.myAlignedPos = 0
+		this.size = size
+		this._file = open(name, mode, buffering)
+
+	def seek(this, offset, whence=0):
+		if whence == 1:
+			this.myRawPos += offset
+		elif whence == 2:
+			if this.size and offset < this.size:
+				this.myRawPos = this.size - offset
+			elif this.size and offset >= this.size:
+				this.myRawPos = 0
+		else:
+			this.myRawPos = offset
+		this.myAlignedPos = (this.myRawPos / 512) * 512
+		this._file.seek(this.myAlignedPos) # inizio del settore contenente pos
+		logging.debug("done disk seek @%x", this.myAlignedPos)
+		
+	def tell(this):
+		return this.myRawPos
+		
+	def read(this, size=-1):
+		# NOTA 1: se l'inizio si trova alla fine di un settore, e la quantità da leggere è piccola
+		# dobbiamo leggere il settore contenente l'inizio *E* quello successivo: correggere!
+		alignedSize = 2 + size/512 
+		if size%512:
+			alignedSize += 1
+		i = this.myRawPos%512
+		j = i+size
+		buf = array.array('c')
+		buf.fromfile(this._file, alignedSize*512)
+		logging.debug("done disk read %d bytes", alignedSize*512)
+		this.myRawPos += size
+		this.seek(this.myRawPos)
+		return buf[i:j] 
