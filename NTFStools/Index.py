@@ -19,6 +19,10 @@ class Index(object):
 			raise EndOfStream
 		if resident:
 			self._indxh = Index_Header(self._buf)
+			if self._indxh.dwEntriesOffset != 0x10: # hack: why a first invalid entry was found in a case?
+				logging.debug("ATTENZIONE: trovata prima INDEX_HEADER non valida:\n%s", self._indxh)
+				self._buf = self._buf[16:]
+				self._indxh = Index_Header(self._buf)
 		else:
 			try:
 				block = Index_Block(self._buf)
